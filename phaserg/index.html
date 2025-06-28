@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trash Rush</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        #connectWallet {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            padding: 10px 15px;
+            background: #8B4513;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-family: sans-serif;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+    <!-- Phaser -->
+    <script src="phaser.min.js"></script>
+    
+
+    <script src="eruda.min.js"></
+    <!-- Wallet Dependencies -->
+    <!-- Update your wallet dependencies section to this: -->
+<!-- Solana Web3 -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.73.0/lib/index.iife.min.js"></script>
+<!-- Wallet Adapter Base -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-base@0.9.20/lib/index.iife.min.js"></script>
+<!-- Wallets (includes Backpack) -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-wallets@0.19.20/lib/index.iife.min.js"></script>
+</head>
+<body>
+    
+    <script>
+    
+    function Llog(message) {
+  fetch('/log', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message: message })
+  })
+  .then(response => response.text())
+  .then(data => {})//console.log(data))
+  .catch(error => console.error(error));
+}
+
+console.log = Llog;
+// Example usage:
+//logToServer('Hello from client!');
+// Example usage:
+Llog('Hello from client!');
+        console.log("hmmmm??");
+        eruda.init({displayConsoleTab:true});
+        
+    </script>
+    
+    <script>console.log("hmm")</script>
+    <div id="game-container"></div>
+    <button id="connectWallet">Connect Backpack</button>
+    
+    <!-- Game Scripts -->
+    <script>console.log("hmm")</script>
+    <script src="js/wallet.js"></script>
+    <script src="js/BaseScene.js"></script>
+    <script src="js/SpriteGroup.js"></script>
+    <script src="js/GameScene.js"></script>
+    <script src="js/game.js"></script>
+
+</body>
+</html>
