@@ -1,7 +1,7 @@
 
 # 🗑️ TrashRush
 
-*TrashRush* is a fast-paced tapping game built for the *Gorbagana* chain — a blazing fast Solana-based experimental testnet chain designed for on-chain multiplayer games.
+*TrashRush* is a fast-paced multipayer (2-4) tapping game built for the *Gorbagana* chain testnet, based on Solana. 
 
 <p align="center">
   <img src="title.png" alt="title" style="max-width: 100%; height: auto;" />
@@ -44,16 +44,23 @@ This game is powered by the *Gorbagana* chain (g-o-r-b-a-g-a-n-a), showcasing in
 - *Backend:* Node.js
 - *Blockchain:* Solana (Gorbagana testnet)
 
+  Transactions are done using Gorbagana.
+
 ---
 
 🚀 How to Play
 
 1. Clone the repo
 2. Run the index.html
-3. Click trash, choose powerups, dominate 3 rounds! 
+3. Connect backpack wallet (make sure you have backpack extension gotten from the site backpack.app). Fund your wallet with the faucet:  faucet.gorbagana.wtf )
+5. Set your rps endpoint in your wallet to rpc.gorbagana.wtf
+6. Click trash, choose powerups, dominate 3 rounds! 
 
+(would support android but unfortunately no backpack wallet, or web extension support, on android browsers)
 
 ⭐ Future plans for development
+
+- Finish up logic for complete game, as well as more polishing
 - Setup different game modes for staking, as well as refund transactions
 - Fix bugs and improve game stability
 - Enhance Multiplayer mode 
