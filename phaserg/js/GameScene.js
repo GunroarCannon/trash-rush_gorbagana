@@ -1685,7 +1685,7 @@ saveHighscore() {
     handleNegativeClick(playerIndex) {
         const player = this.players[playerIndex];
         const scoreText = this.scoreTexts[playerIndex];
-        const player = this.players[playerIndex];
+        
         if (player.negativeModeImmune) return;
         // Play negative sound
         this.sound.play('negative_sound');
