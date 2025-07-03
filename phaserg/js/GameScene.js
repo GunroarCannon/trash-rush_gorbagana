@@ -296,7 +296,7 @@ class GameScene extends BaseScene {
             data.players.forEach((p)=> {
                 this.addRemotePlayer(p.id, p.position, p.character);
             });
-            this.localPlayer = this.remotePlayers[this.localPlayerId].player;
+            this.localPlayer = this.remotePlayers[this.localPlayerId]?.player;
             this.showWaitingForPlayers(data.gameId);
         });
 
@@ -994,6 +994,12 @@ startGameCountDown() {
         const player = new SpriteGroup(this, x, y, ['character_bg', characterType, 'character_bg_top']);
         player.setDisplaySize(415, 415);
     
+        player.pointsMultiplier = 1;
+        player.staminaCost = 5;
+        player.staminaDrainRate = 1;
+        player.critMultiplier = 1;
+        player.normalMultiplier = 1;
+
         if (isRightSide) {
             player._layers[1].setFlipX(true);
             if (playerIndex === 3) {
@@ -1368,6 +1374,11 @@ this.tweens.add({
     
     endGame() {
         // Handle game end logic
+        this.players.forEach(player => {
+    if (player.passiveIncome) {
+        player.passiveIncome.destroy();
+    }
+});
         this.scene.start('GameOverScene', { bgContainer:this.bgContainer,playerData:this.players,isMultiplayer:this.isMultiplayer,scores: this.scoreTexts.map(t => parseInt(t.text)) });
     }
 
@@ -1503,17 +1514,20 @@ saveHighscore() {
     }
 
     handleTrashClick(playerIndex) {
+        const player = this.players[playerIndex];
         if (this.negativeMode) {
             this.handleNegativeClick(playerIndex);
-            return;
+            if (!player.negativeModeImmune)
+                return;
         }
-        
-        if (this.playerStaminaValues[playerIndex] < 5) return;
+        const staminaCost = (player.staminaCost || 5) * (player.staminaDrainRate || 1);
+
+
+        if (this.playerStaminaValues[playerIndex] < staminaCost) return;
         
         // Deduct stamina
-        this.playerStaminaValues[playerIndex] -= this.players[playerIndex].staminaCost||5;
+        this.playerStaminaValues[playerIndex] = Math.max(0, this.playerStaminaValues[playerIndex] - staminaCost);
         this.updateStaminaBar(playerIndex);
-        
         // Add growth effect
         this.tweens.add({
             targets: this.trash._layers,
@@ -1524,7 +1538,7 @@ saveHighscore() {
             ease: 'Power1'
         });
         
-        const player = this.players[playerIndex];
+        
         const scoreText = this.scoreTexts[playerIndex];
         
         /* Particles
@@ -1549,7 +1563,43 @@ saveHighscore() {
         
         // Determine points
         const pointOptions = [1,1,1,1,1,1,1,2,2,2,2,3,3];
-        const points = Phaser.Utils.Array.GetRandom(pointOptions)*(player.pointsMultiplier||1);
+        
+    // Determine points with powerup modifiers
+    let basePoints = Phaser.Utils.Array.GetRandom(pointOptions);
+    const player = this.players[playerIndex];
+    
+    // Apply powerup modifiers
+    if (player.calculatePoints) {
+        basePoints = player.calculatePoints(basePoints);
+    } else {
+        // Apply standard multipliers
+        if (player.pointsMultiplier) basePoints *= player.pointsMultiplier;
+        if (isCritical && player.critMultiplier) basePoints *= player.critMultiplier;
+        if (!isCritical && player.normalMultiplier) basePoints *= player.normalMultiplier;
+        
+        // Check for lucky interval
+        if (player.luckyInterval && ++player.clickCount % player.luckyInterval === 0) {
+            basePoints *= 3;
+        }
+        
+        // Check for golden trash bonus
+        if (player.goldenMultiplier && this.trash.img.texture.key.includes('golden')) {
+            basePoints *= player.goldenMultiplier;
+        }
+        
+        // Check for endgame bonus
+        if (player.endgameMultiplier && this.roundTime <= 5) {
+            basePoints *= player.endgameMultiplier;
+        }
+        
+        // Apply berserk multiplier if exists
+        if (player.getDamageMultiplier) {
+            basePoints *= player.getDamageMultiplier();
+        }
+    }
+    
+    const points = basePoints;
+    
         const isCritical = Phaser.Math.Between(1, 100) <= (player.critChance||5);
         
         // Reset combo if too much time passed
@@ -1635,7 +1685,8 @@ saveHighscore() {
     handleNegativeClick(playerIndex) {
         const player = this.players[playerIndex];
         const scoreText = this.scoreTexts[playerIndex];
-        
+        const player = this.players[playerIndex];
+        if (player.negativeModeImmune) return;
         // Play negative sound
         this.sound.play('negative_sound');
         
