@@ -1566,7 +1566,7 @@ saveHighscore() {
         
     // Determine points with powerup modifiers
     let basePoints = Phaser.Utils.Array.GetRandom(pointOptions);
-    const player = this.players[playerIndex];
+  
     
     // Apply powerup modifiers
     if (player.calculatePoints) {
