@@ -34,7 +34,7 @@ Choose powerups and compete over *3 intense rounds* — the player with the high
 
 🌐 Built For Gorbagana Chain
 
-This game is powered by the *Gorbagana* chain (g-o-r-b-a-g-a-n-a), showcasing instant finality and zero-MEV performance.
+This game is powered by the *Gorbagana* chain, showcasing instant finality and zero-MEV performance.
 
 ---
 
