@@ -88,7 +88,7 @@ async  wakeRenderServer() {
         }
         this.game.soundManager.create();
         this.initAudio();
-        this.scene.start('GameScene' ||  'TitleScene');
+        this.scene.start(!'GameScene' ||  'TitleScene');
     }
 
     initAudio() {
