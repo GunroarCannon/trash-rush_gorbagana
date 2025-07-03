@@ -3,6 +3,10 @@
 
 *TrashRush* is a fast-paced tapping game built for the *Gorbagana* chain — a blazing fast Solana-based experimental testnet chain designed for on-chain multiplayer games.
 
+<p align="center">
+  <img src="title.png" alt="title" style="max-width: 100%; height: auto;" />
+</p>
+
 🎮 Gameplay Overview
 
 Click on trash as fast as you can to earn points and defeat your opponents!  
@@ -23,6 +27,10 @@ Choose powerups and compete over *3 intense rounds* — the player with the high
 - 🎨 Frontend made with *Phaser 3* (JavaScript)
 
 ---
+
+<p align="center">
+  <img src="monster.png" alt="title" style="max-width: 100%; height: auto;" />
+</p>
 
 🌐 Built For Gorbagana Chain
 
