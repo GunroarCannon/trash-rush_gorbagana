@@ -1,3 +1,4 @@
+const GOR_MIN = 2;
 
 // Background Scene
 class BackgroundScene extends Phaser.Scene {
@@ -36,9 +37,44 @@ class BootScene extends BaseScene {
     constructor() {
         console.log("created Boot");
         super('BootScene');
+    }// In your GameScene.js or networking module
+async  wakeRenderServer() {
+    try {
+        const wakeResponse = await fetch('https://trash-rush-server.onrender.com/wake', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-wake-up': 'true' // Custom header to identify wake calls
+            },
+            body: JSON.stringify({
+                source: 'client',
+                timestamp: Date.now()
+            })
+        });
+
+        if (!wakeResponse.ok) {
+            throw new Error(`Server responded with ${wakeResponse.status}`);
+        }
+
+        const data = await wakeResponse.json();
+        console.log('Server wake successful:', data);
+        return { success: true, ping: data.ping };
+    } catch (error) {
+        console.error('Wake attempt failed:', error.message);
+        return { success: false, error: error.message };
     }
+}
+
 
     preload() {
+        this.wakeRenderServer();
+        this.game.soundManager = new SoundManager(this);
+        
+        
+        this.load.image('spark', 'assets/spark.png'); // For networked player effects
+        
+        
+    
         this.load.font('comic', 'comic.ttf');
         this.load.audio('titleMusic', 'song1.mp3');
         this.load.audio('gameMusic', 'song2.mp3');
@@ -50,8 +86,9 @@ class BootScene extends BaseScene {
             console.log('Wallet connected:', window.walletManager.publicKey.toString());
             // You can now use walletManager in your game scenes
         }
+        this.game.soundManager.create();
         this.initAudio();
-        this.scene.start('TitleScene');
+        this.scene.start('GameScene' ||  'TitleScene');
     }
 
     initAudio() {
@@ -90,11 +127,13 @@ class TitleScene extends BaseScene {
     playTitleMusic() {
         try {
             if (!this.titleMusic) {
-                this.titleMusic = this.sound.add('titleMusic', { loop: true, volume: 0.5 });
-                this.titleMusic.play();
+                //this.titleMusic = this.sound.add('titleMusic', { loop: true, volume: 0.5 });
+                //this.titleMusic.play();
+                this.game.soundManager.playMainMusic();
+
             }
         } catch (e) {
-            console.warn('Audio playback error:', e);
+            console.warn('Audio playback error:', e.message);
         }
     }
 
@@ -198,12 +237,16 @@ class TitleScene extends BaseScene {
         });
     }
 }
-
 // Menu Scene
 class MenuScene extends BaseScene {
     constructor() {
         super('MenuScene');
         this.titleMusic = null;
+        this.connectButton = null;
+        this.playButton = null;
+        this.disconnectButton = null;
+        this.menuButtons = [];
+        this.isTweening = false;
     }
     
     init(data) {
@@ -216,45 +259,55 @@ class MenuScene extends BaseScene {
         this.scene.get("BackgroundScene").showBackground();
         this.createMenuButtons();
         this.createBackButton();
-    }
-    
-    handleBackAction() {
-        if (confirm('Do you want to exit the game?')) {
-            if (this.titleMusic) this.titleMusic.stop();
-            window.close();
-        }
+        this.updateWalletButton();
+        
+        document.addEventListener('walletConnected', () => this.onWalletConnected());
+        document.addEventListener('walletDisconnected', () => this.updateWalletButton());
     }
     
     createMenuButtons() {
         const centerX = this.sys.game.config.width / 2;
-        const buttonStyle = {
-            fontFamily: 'Comic',
-            fontSize: '62px',
-            color: '#ffffff',
-            backgroundColor: '#8B4513',
-            padding: { x: 20, y: 10 },
-            fixedWidth: 500,
-            align: 'center'
-        };
+       
+    const buttonStyle = {
+        fontFamily: 'Comic',
+        fontSize: '48px',
+        color: '#FFD700', // Gold text
+        stroke: '#8B4513', // Brown border
+        strokeThickness: 8,
+        shadow: {
+            offsetX: 4,
+            offsetY: 4,
+            color: '#000000',
+            blur: 0,
+            stroke: true,
+            fill: true
+        },
+        backgroundColor: '#5D2906', // Darker brown
+        padding: { x: 30, y: 15 },
+        fixedWidth: 450,
+        align: 'center'
+    };
         
-        if (window.walletManager && !window.walletManager.connected) {
-            const connectBtn = this.add.text(100, 100, 'Connect Wallet', { 
-                fontFamily: 'Comic', 
-                fontSize: '24px', 
-                color: '#ffffff',
-                backgroundColor: '#8B4513',
-                padding: { x: 10, y: 5 }
-            })
-            .setInteractive()
-            .on('pointerdown', () => {
-                window.walletManager.connect();
-            });
-        }
+        const walletConnected = window.walletManager?.connected;
+        
+        let nn = 70;
+        this.playButton = this.add.text(
+            centerX,
+            300+nn, //walletConnected ? 300 : 400,
+            'Play Game',
+            buttonStyle
+        ).setOrigin(0.5).setInteractive();
+        
+        this.connectButton = this.add.text(
+            centerX,
+            400+nn, //walletConnected ? 400 : 300,
+            'Connect Wallet',
+            buttonStyle
+        ).setOrigin(0.5).setInteractive();
         
         const buttons = [
-            { text: 'Play Game', y: 300, action: () => this.startGame() },
-            { text: 'Options', y: 400, action: () => console.log('Options clicked') },
-            { text: 'Credits', y: 500, action: () => console.log('Credits clicked') }
+            //{ text: 'Options', y: walletConnected ? 500 : 500, action: () => console.log('Options clicked') },
+            { text: 'How to Play', y: walletConnected ? 500+nn : 500+nn, action: () => this.showHowToPlay() }
         ];
         
         buttons.forEach(btn => {
@@ -265,47 +318,697 @@ class MenuScene extends BaseScene {
                 buttonStyle
             ).setOrigin(0.5).setInteractive();
             
-            button.on('pointerover', () => {
+            this.setupButtonInteractions(button, btn.action);
+            this.menuButtons.push(button);
+        });
+        
+        if (walletConnected) {
+            //this.createDisconnectButton();
+        }
+        
+        this.setupButtonInteractions(this.playButton, () => this.showStakeConfirmation());
+        this.setupButtonInteractions(this.connectButton, () => 
+            {
+                //this.showWalletSelector();
+                this.handleWalletConnect("backpack");
+            });
+    }
+    
+    createDisconnectButton() {
+        /*const centerX = this.sys.game.config.width / 2;
+        this.disconnectButton = this.add.text(
+            centerX,
+            700,
+            'Disconnect Wallet',
+            {
+                fontFamily: 'Comic',
+                fontSize: '36px',
+                color: '#ffffff',
+                backgroundColor: '#ff0000',
+                padding: { x: 20, y: 10 },
+                fixedWidth: 400,
+                align: 'center'
+            }
+        ).setOrigin(0.5).setInteractive();
+        
+        this.setupButtonInteractions(this.disconnectButton, () => this.handleWalletDisconnect());
+        this.menuButtons.push(this.disconnectButton);*/
+    }
+    
+    setupButtonInteractions(button, action, ignoreTweening) {
+        button.on('pointerover', () => {
+            if (!this.isTweening||ignoreTweening) {
                 button.setStyle({ fill: '#ffff00' });
                 button.setScale(1.05);
-            });
+            }
+        });
+        
+        button.on('pointerout', () => {
+            if (!this.isTweening||ignoreTweening) {
+            button.setStyle({ fill: '#ffffff' });
+            button.setScale(1);
+            this.game.soundManager.playMenuSound();
+            }
+        });
+        
+        button.on('pointerdown', () => {
+            if (this.isTweening&&!ignoreTweening) return;
             
-            button.on('pointerout', () => {
-                button.setStyle({ fill: '#ffffff' });
-                button.setScale(1);
+            this.game.soundManager.playScoreSound();
+            this.tweens.add({
+                targets: button,
+                angle: Phaser.Math.Between(-5, 5),
+                duration: 100,
+                yoyo: true,
+                repeat: 3,
+                ease: 'Sine.easeInOut'
             });
-            
-            button.on('pointerdown', () => {
-                this.tweens.add({
-                    targets: button,
-                    angle: Phaser.Math.Between(-5, 5),
-                    duration: 100,
-                    yoyo: true,
-                    repeat: 3,
-                    delay: Phaser.Math.Between(0, 1000),
-                    ease: 'Sine.easeInOut'
-                });
-                this.time.delayedCall(120, btn.action);
-            });
+            this.time.delayedCall(120, action);
         });
     }
     
-    startGame() {
-        if (this.titleMusic && this.titleMusic.isPlaying) {
-            this.titleMusic.stop();
+    
+async showWalletSelector() {
+    if (this.isTweening) return;
+    
+    // Create modal elements
+    const modalBg = this.add.graphics()
+        .fillStyle(0x000000, 0.7)
+        .fillRect(0, 0, this.sys.game.config.width, this.sys.game.config.height)
+        .setInteractive();
+    
+    const panel = this.add.graphics()
+        .fillStyle(0x8B4513, 0.9)
+        .fillRoundedRect(
+            this.sys.game.config.width / 2 - 300,
+            this.sys.game.config.height / 2 - 200,
+            600, 400, 20
+        );
+    
+    // Title
+    const titleText = this.add.text(
+        this.sys.game.config.width / 2,
+        this.sys.game.config.height / 2 - 150,
+        'Select Wallet',
+        {
+            fontFamily: 'Comic',
+            fontSize: '48px',
+            color: '#ffffff',
+            align: 'center'
         }
-        this.fadeToScene('GameScene', { bgContainer: this.bgContainer });
-    }
+    ).setOrigin(0.5);
+    
+    // Get available wallets
+    const availableWallets = window.walletManager?.detectedWallets || [];
+    const buttonStyle = {
+        fontFamily: 'Comic',
+        fontSize: '36px',
+        color: '#ffffff',
+        backgroundColor: '#8B4513',
+        padding: { x: 20, y: 10 },
+        fixedWidth: 400,
+        align: 'center'
+    };
+    
+    // Store all created elements for cleanup
+    const modalElements = [modalBg, panel, titleText];
+    
+    // Create wallet buttons with icons
+    availableWallets.forEach((wallet, index) => {
+        // Create button container
+        const buttonContainer = this.add.container(
+            this.sys.game.config.width / 2,
+            this.sys.game.config.height / 2 - 50 + (index * 100)
+        );
+        
+        // Create button background
+        const buttonBg = this.add.graphics()
+            .fillStyle(0x8B4513, 1)
+            .fillRoundedRect(-200, -30, 400, 60, 15);
+        
+        // Create button text
+        const buttonText = this.add.text(
+            0,
+            0,
+            wallet.name.charAt(0).toUpperCase() + wallet.name.slice(1),
+            {
+                fontFamily: 'Comic',
+                fontSize: '36px',
+                color: '#ffffff',
+                align: 'center'
+            }
+        ).setOrigin(0.5);
+        
+        // Try to load wallet icon
+        try {
+            const icon = this.add.image(-150, 0, `${wallet.name}_icon`)
+                .setDisplaySize(40, 40)
+                .setOrigin(0.5);
+            buttonContainer.add(icon);
+        } catch (e) {
+            console.warn(`Couldn't load icon for ${wallet.name}:`, e);
+        }
+        
+        buttonContainer.add([buttonBg, buttonText]);
+        buttonContainer.setInteractive(
+            new Phaser.Geom.Rectangle(-200, -30, 400, 60),
+            Phaser.Geom.Rectangle.Contains
+        );
+        
+        buttonContainer.on('pointerdown', async () => {
+            // Clean up all modal elements
+            modalElements.forEach(element => element.destroy());
+            buttonContainer.destroy();
+            
+            // Handle wallet connection
+            await this.handleWalletConnect(wallet.name);
+        });
+        
+        modalElements.push(buttonContainer);
+    });
+    
+    // Close button
+    const closeButton = this.add.text(
+        this.sys.game.config.width / 2,
+        this.sys.game.config.height / 2 + 150,
+        'Close',
+        buttonStyle
+    ).setOrigin(0.5).setInteractive();
+    
+    modalElements.push(closeButton);
+    
+    closeButton.on('pointerdown', () => {
+        // Clean up all modal elements
+        modalElements.forEach(element => element.destroy());
+    });
 }
 
+    async handleWalletConnect(walletName = null) {
+        try {
+            //this.isTweening = true;
+            this.connectButton.setText('Connecting...');
+            this.connectButton.setStyle({ backgroundColor: '#FFA500' });
+            this.connectButton.setInteractive(false);
+            this.playButton.setInteractive(false);
+            
+            await window.walletManager.connect(walletName);
+            
+            const wallet = window.walletManager;
+            this.connectButton.setText(wallet.getShortAddress());
+            this.connectButton.setStyle({ backgroundColor: '#4CAF50' });
+            this.showNotification('CONNECTED!',0x00FF00);
+        } catch (error) {
+            this.connectButton.setText('Connect Wallet');
+            this.connectButton.setStyle({ backgroundColor: '#8B4513' });
+            
+            this.showNotification(`${error.message}\nCheck internet connection or backpack extension.`,0xFF0000);
+        } finally {
+            this.connectButton.setInteractive(true);
+            this.playButton.setInteractive(true);
+            this.isTweening = false;
+        }
+    }
+    
+    async handleWalletDisconnect() {
+        try {
+            this.isTweening = true;
+            this.connectButton.setInteractive(false);
+            this.playButton.setInteractive(false);
+            this.disconnectButton?.setInteractive(false);
+            
+            await window.walletManager.disconnect();
+            
+            if (this.disconnectButton) {
+                this.disconnectButton.destroy();
+                this.disconnectButton = null;
+            }
+            
+            this.updateWalletButton();
+            
+            if (false) {
+            this.tweens.add({
+                targets: this.playButton,
+                y: 400,
+                duration: 300,
+                ease: 'Power2'
+            });
+            
+            this.tweens.add({
+                targets: this.connectButton,
+                y: 300,
+                duration: 300,
+                ease: 'Power2',
+                onComplete: () => {
+                    this.connectButton.setInteractive(true);
+                    this.playButton.setInteractive(true);
+                    this.isTweening = false;
+                }
+            });
+        }
+            
+        } catch (error) {
+            console.error('Disconnect failed:', error);
+            this.showNotification(`Disconnect failed: ${error.message}`, '#ff0000');
+            this.connectButton.setInteractive(true);
+            this.playButton.setInteractive(true);
+            this.disconnectButton?.setInteractive(true);
+            this.isTweening = false;
+        }
+    }
+    
+    nadda () {}
 
+    updateWalletButton() {
+        if (!this.connectButton || this.isTweening) return;
+        
+        const wallet = window.walletManager;
+        if (!wallet) {
+            this.connectButton.setText('Install Wallet');
+            this.connectButton.setStyle({ backgroundColor: '#ff0000' });
+            this.connectButton.on('pointerdown', () => window.open('https://phantom.app/', '_blank'));
+            return;
+        }
+
+
+        
+        if (wallet.connected) {
+            this.connectButton.setText(wallet.getShortAddress());
+            this.connectButton.setStyle({ backgroundColor: '#4CAF50' });
+            this.connectButton.on('pointerdown', this.nadda);
+            
+            if (false && this.playButton.y > this.connectButton.y) {
+                this.isTweening = true;
+                this.connectButton.setInteractive(false);
+                this.playButton.setInteractive(false);
+                
+                /*this.tweens.add({
+                    targets: this.playButton,
+                    y: this.connectButton.y,
+                    duration: 300,
+                    ease: 'Power2'
+                });
+                
+                this.tweens.add({
+                    targets: this.connectButton,
+                    y: this.playButton.y,
+                    duration: 300,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        this.connectButton.setInteractive(true);
+                        this.playButton.setInteractive(true);
+                        this.isTweening = false;
+                        
+                        if (!this.disconnectButton) {
+                            this.createDisconnectButton();
+                        }
+                    }
+                });*/
+            }
+        } else {
+            this.connectButton.setText('Connect Wallet');
+            this.connectButton.setStyle({ backgroundColor: '#8B4513' });
+            this.connectButton.on('pointerdown', () => {
+                //this.showWalletSelector()
+                this.handleWalletConnect("backpack");
+        });
+            
+            if (this.disconnectButton) {
+                this.disconnectButton.destroy();
+                this.disconnectButton = null;
+                this.menuButtons = this.menuButtons.filter(btn => btn !== this.disconnectButton);
+            }
+            
+            if (false && this.playButton.y < this.connectButton.y) {
+                this.isTweening = true;
+                this.connectButton.setInteractive(false);
+                this.playButton.setInteractive(false);
+                
+                this.tweens.add({
+                    targets: this.playButton,
+                    y: 400,
+                    duration: 300,
+                    ease: 'Power2'
+                });
+                
+                this.tweens.add({
+                    targets: this.connectButton,
+                    y: 300,
+                    duration: 300,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        this.connectButton.setInteractive(true);
+                        this.playButton.setInteractive(true);
+                        this.isTweening = false;
+                    }
+                });
+            }
+        }
+    }
+    
+    onWalletConnected() {
+        this.updateWalletButton();
+        //this.connectButton.setText('Connected!');
+        
+        if (false && this.playButton && this.playButton.y < this.connectButton.y) {
+            this.tweens.add({
+                targets: this.playButton,
+                y: this.connectButton.y,
+                duration: 500,
+                ease: 'Power2'
+            });
+            
+            this.tweens.add({
+                targets: this.connectButton,
+                y: this.playButton.y,
+                duration: 500,
+                ease: 'Power2',
+                onComplete: () => {
+                    this.tweens.add({
+                        targets: this.playButton,
+                        angle: { from: -10, to: 10 },
+                        duration: 100,
+                        yoyo: true,
+                        repeat: 5,
+                        ease: 'Sine.easeInOut'
+                    });
+                }
+            });
+        }
+    }
+    
+    showHowToPlay() {
+        this.isTweening = true;
+        const modalBg = this.add.graphics()
+            .fillStyle(0x000000, 0.7)
+            .fillRect(0, 0, this.sys.game.config.width, this.sys.game.config.height)
+            .setInteractive();
+        
+        const infoText = `
+1. Connect your BACKPACK wallet
+2. Stake ${GOR_MIN} GOR tokens to enter the game
+3. Compete against other players in a fast-paced TRASH tapping game
+4. DON'T TAP WHEN THE TRASH MONSTER ARRIVES  OR ELSE!!
+5. Your staked tokens go into the prize pool
+6. The player who taps the most wins after 3 rounds the pool!`;
+        
+        const textBox = this.add.graphics()
+            .fillStyle(0x8B4513, 0.9)
+            .fillRoundedRect(
+                this.sys.game.config.width / 2 - 350,
+                this.sys.game.config.height / 2 - 250,
+                700, 500, 20
+            );
+        
+        const howToText = this.add.text(
+            this.sys.game.config.width / 2,
+            this.sys.game.config.height / 2 - 50,
+            infoText,
+            {
+                fontFamily: 'Comic',
+                fontSize: '28px',
+                color: '#ffffff',
+                align: 'center',
+                lineSpacing: 10,
+                wordWrap: { width: 650 }
+            }
+        ).setOrigin(0.5);
+        
+        const closeButton = this.add.text(
+            this.sys.game.config.width / 2,
+            this.sys.game.config.height / 2 + 200,
+            'Close',
+            {
+                fontFamily: 'Comic',
+                fontSize: '36px',
+                color: '#ffffff',
+                backgroundColor: '#8B4513',
+                padding: { x: 20, y: 10 },
+                fixedWidth: 200,
+                align: 'center'
+            }
+        ).setOrigin(0.5).setInteractive();
+        
+        this.setupButtonInteractions(closeButton, () => {
+            modalBg.destroy();
+            textBox.destroy();
+            howToText.destroy();
+            closeButton.destroy();
+            this.isTweening = false;
+        },true);
+    }
+    
+    async showStakeConfirmation() {
+        if (!window.walletManager?.connected) {
+            this.showNotification('Please connect your wallet first');
+            return;
+        }
+        
+        try {
+            const balance = await window.walletManager.getBalance();
+            if (balance.gor < GOR_MIN) {
+                this.showNotification(`Insufficient balance! You need at least ${GOR_MIN} GOR`, '#ff0000');
+                return;
+            }
+        } catch (error) {
+            this.showNotification(`Error checking balance: ${error.message}\nPlease check metwrk connection.`, '#ff0000');
+            return;
+        }
+        
+        const modalBg = this.add.graphics()
+            .fillStyle(0x000000, 0.7)
+            .fillRect(0, 0, this.sys.game.config.width, this.sys.game.config.height)
+            .setInteractive();
+        
+        const bgPanel = this.add.graphics()
+            .fillStyle(0x8B4513, 1.0)
+            .fillRoundedRect(
+                this.sys.game.config.width / 2 - 300,
+                this.sys.game.config.height / 2 - 150,
+                600, 300, 20
+            );
+        
+        const confirmText = this.add.text(
+            this.sys.game.config.width / 2,
+            this.sys.game.config.height / 2 - 80,
+            `To play, you need to stake ${GOR_MIN} GOR tokens\n\nThis goes into the prize pool\nWinner takes all!`,
+            {
+                fontFamily: 'Comic',
+                fontSize: '28px',
+                color: '#ffffff',
+                align: 'center',
+                wordWrap: { width: 550 }
+            }
+        ).setOrigin(0.5);
+        
+        const buttonStyle = {
+            fontFamily: 'Comic',
+            fontSize: '36px',
+            color: '#ffffff',
+            backgroundColor: '#8B4513',
+            padding: { x: 20, y: 10 },
+            fixedWidth: 250,
+            align: 'center'
+        };
+        
+        const confirmButton = this.add.text(
+            this.sys.game.config.width / 2 - 160,
+            this.sys.game.config.height / 2 + 80,
+            'Confirm',
+            buttonStyle
+        ).setOrigin(0.5).setInteractive();
+        
+        const cancelButton = this.add.text(
+            this.sys.game.config.width / 2 + 160,
+            this.sys.game.config.height / 2 + 80,
+            'Cancel',
+            buttonStyle
+        ).setOrigin(0.5).setInteractive();
+        
+        this.setupButtonInteractions(confirmButton, async () => {
+            modalBg.destroy();
+            bgPanel.destroy();
+            confirmText.destroy();
+            confirmButton.destroy();
+            cancelButton.destroy();
+            
+            await this.stakeTokens();
+        });
+        
+        this.setupButtonInteractions(cancelButton, () => {
+            modalBg.destroy();
+            bgPanel.destroy();
+            confirmText.destroy();
+            confirmButton.destroy();
+            cancelButton.destroy();
+        });
+    }
+    
+    async stakeTokens() {
+        try {
+            const processingBg = this.add.graphics()
+                .fillStyle(0x8B4513, 0.9)
+                .fillRoundedRect(
+                    this.sys.game.config.width / 2 - 300,
+                    this.sys.game.config.height / 2 - 100,
+                    600, 200, 20
+                );
+            
+            const loadingText = this.add.text(
+                this.sys.game.config.width / 2,
+                this.sys.game.config.height / 2 - 30,
+                'Processing transaction...\nPlease approve in your wallet',
+                {
+                    fontFamily: 'Comic',
+                    fontSize: '28px',
+                    color: '#ffffff',
+                    align: 'center',
+                    wordWrap: { width: 550 }
+                }
+            ).setOrigin(0.5);
+            
+            const statusText = this.add.text(
+                this.sys.game.config.width / 2,
+                this.sys.game.config.height / 2 + 40,
+                'Fetching transaction info...',
+                {
+                    fontFamily: 'Comic',
+                    fontSize: '20px',
+                    color: '#ffffff',
+                    align: 'center'
+                }
+            ).setOrigin(0.5);
+            
+            this.time.delayedCall(1000, () => {
+                statusText.setText('Checking wallet balance...');
+            });
+            
+            this.time.delayedCall(2000, () => {
+                statusText.setText('Creating transaction...');
+            });
+            
+            const result = await window.walletManager.stakeTokens(GOR_MIN);
+            
+            if (result.success) {
+                statusText.setText('Transaction confirmed! Starting game...');
+                
+                this.time.delayedCall(2000, () => {
+                    processingBg.destroy();
+                    loadingText.destroy();
+                    statusText.destroy();
+                    this.startGame();
+                });
+            } else {
+                processingBg.destroy();
+                loadingText.destroy();
+                statusText.destroy();
+                throw new Error(result.error && result.error.message || 'Transaction failed');
+            }
+        } catch (error) {
+            const errorText = this.add.text(
+                this.sys.game.config.width / 2,
+                this.sys.game.config.height / 2,
+                error.message,
+                {
+                    fontFamily: 'Comic',
+                    fontSize: '28px',
+                    color: '#ff0000',
+                    align: 'center',
+                    wordWrap: { width: 550 }
+                }
+            ).setOrigin(0.5);
+            
+            this.time.delayedCall(3000, () => errorText.destroy());
+        }
+    }
+    
+    startGame() {
+        if (this.titleMusic) this.titleMusic.stop();
+        this.fadeToScene('GameScene', { bgContainer: this.bgContainer });
+    }
+    
+    createBackButton() {
+        this.backButton = this.add.text(50, 50, '←', {
+            fontFamily: 'Comic',
+            fontSize: '48px',
+            color: '#ffffff',
+            backgroundColor: '#8B4513',
+            padding: { x: 15, y: 5 }
+        }).setInteractive();
+        
+        this.setupButtonInteractions(this.backButton, () => this.handleBackAction());
+        
+        this.backKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+        this.backKey.on('down', () => this.handleBackAction());
+        
+        this.input.keyboard.on('keydown-BACKSPACE', () => this.handleBackAction());
+    }
+
+    handleBackAction() {
+        if (confirm('Do you want to exit the game?')) {
+            if (this.titleMusic) this.titleMusic.stop();
+            window.close();
+        }
+    }
+
+    showNotification(message, color = '#000000', duration = 2000) {
+        const bg = this.add.graphics()
+            .fillStyle(0xFFB380,.9)//Phaser.Display.Color.RGBToString(255,179, 128), 0.9)
+            .fillRoundedRect(
+                this.sys.game.config.width / 2 - 225,
+                this.sys.game.config.height - 220,
+                450, 200, 10
+            );
+        
+        const notification = this.add.text(
+            this.sys.game.config.width / 2,
+            this.sys.game.config.height - 110,
+            message,
+            {
+                fontFamily: 'Comic',
+                fontSize: '30px',
+                color: color,
+                align: 'center',
+                wordWrap: { width: 430 }
+            }
+        ).setOrigin(0.5);
+        
+        this.time.delayedCall(duration, () => {
+            this.tweens.add({
+                targets: [notification, bg],
+                alpha: 0,
+                duration: 500,
+                onComplete: () => {
+                    notification.destroy();
+                    bg.destroy();
+                }
+            });
+        });
+    }
+
+    resizeUI() {
+        const centerX = this.sys.game.config.width / 2;
+        
+        if (this.connectButton) {
+            this.connectButton.setPosition(centerX, this.connectButton.y);
+        }
+        
+        this.menuButtons.forEach((button, index) => {
+            button.setPosition(centerX, button.y);
+        });
+        
+        if (this.backButton) {
+            this.backButton.setPosition(50, 50);
+        }
+    }
+}
+/*
 // Game Configuration
 const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
     width: 1920,
     height: 1080,
-    scene: [BootScene, BackgroundScene, TitleScene, MenuScene, GameScene],
+    scene: [BootScene,GameScene,GameOverScene] ?? [BootScene, BackgroundScene, TitleScene, MenuScene, GameScene, GameOverScene],
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -318,4 +1021,4 @@ const config = {
 };
 
 // Initialize the game
-new Phaser.Game(config);
+new Phaser.Game(config);*/

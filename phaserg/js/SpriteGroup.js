@@ -38,6 +38,8 @@ class SpriteGroup {
     addLayer(texture, depth = this._layers.length, isMain = false) {
         const img = this.scene.add.image(0, 0, texture);
         img.setDepth(depth);
+        img.offsetY = 0;
+        
         this._layers.push(img);
         
         if (isMain || this._layers.length === 1) {
@@ -134,7 +136,25 @@ class SpriteGroup {
         });
         return this;
     }
+    setOrigin(x, y = x) {
+        this._layers.forEach(layer => {
+            const newX = x !== undefined ? x : 0;
+            const newY = y !== undefined ? y : 0;
+            layer.setOrigin(newX, newY);
+        });
+        return this;
+    }
+
     
+    setDepth(d) {
+        for (let i =0; i<this._layers.length; i++){
+            this._layers[i].setDepth(d+i/10);
+        }
+        /*this._layers.forEach(layer => {
+            layer.setDepth(d);
+        });*/
+        return this;
+    }
     // ======================
     // Visual Properties
     // ======================
@@ -214,8 +234,8 @@ class SpriteGroup {
     // ======================
     _updatePosition() {
         this._layers.forEach(layer => {
-            layer.x = this._targetX || layer.x;
-            layer.y = this._targetY || layer.y;
+            layer.x = (this._targetX || 0) + (layer.offsetX || 0);
+            layer.y = (this._targetY || 0) + (layer.offsetY || 0);
         });
     }
 }

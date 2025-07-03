@@ -37,20 +37,69 @@
             font-size: 16px;
             cursor: pointer;
         }
-    </style>
-    <!-- Phaser -->
+.wallet-selector {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.wallet-selector-content {
+    background: #2a2a2a;
+    padding: 2rem;
+    border-radius: 10px;
+    max-width: 400px;
+    width: 100%;
+}
+
+.wallet-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    background: #333;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wallet-btn:hover {
+    background: #444;
+}
+
+.wallet-btn img {
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+}
+    </style><!-- Load buffer polyfill first -->
+    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <script>
+      window.Buffer = window.buffer.Buffer;
+    </script>
+
+    <!-- Phasr -->
     <script src="phaser.min.js"></script>
     
 
-    <script src="eruda.min.js"></
+    <script src="eruda.min.js"></script>
     <!-- Wallet Dependencies -->
     <!-- Update your wallet dependencies section to this: -->
-<!-- Solana Web3 -->
-<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.73.0/lib/index.iife.min.js"></script>
-<!-- Wallet Adapter Base -->
-<script src="https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-base@0.9.20/lib/index.iife.min.js"></script>
-<!-- Wallets (includes Backpack) -->
-<script src="https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-wallets@0.19.20/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.73.0/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-base@0.9.20/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-wallets@0.19.20/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-backpack@0.1.0/lib/index.iife.min.js"></script>
 </head>
 <body>
     
@@ -81,15 +130,47 @@ Llog('Hello from client!');
     
     <script>console.log("hmm")</script>
     <div id="game-container"></div>
-    <button id="connectWallet">Connect Backpack</button>
-    
+
     <!-- Game Scripts -->
     <script>console.log("hmm")</script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+    <script src="js/utils.js"></script>
     <script src="js/wallet.js"></script>
+    <script src="js//SoundManager.js"></script>
+    <script src="js/MultiplayerManager.js"></script>
+    <script src="js/powerups.js"></script>
+    <script src="js/GameOverScene.js"></script>
     <script src="js/BaseScene.js"></script>
     <script src="js/SpriteGroup.js"></script>
     <script src="js/GameScene.js"></script>
     <script src="js/game.js"></script>
 
+    <!-- Main game initialization LAST -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const config = {
+                type: Phaser.AUTO,
+                parent: 'game-container',
+                width: 1920,
+                height: 1080,
+                scene: [BootScene, BackgroundScene,   TitleScene, MenuScene, GameScene, GameOverScene],
+                scale: {
+                    mode: Phaser.Scale.FIT,
+                    autoCenter: Phaser.Scale.CENTER_BOTH
+                },
+                backgroundColor: '#000000',
+                audio: {
+                    disableWebAudio: false,
+                    noAudio: false
+                },
+                dom: {
+                    createContainer: true
+                }
+            };
+            
+            new Phaser.Game(config);
+        });
+        </script>
 </body>
 </html>
